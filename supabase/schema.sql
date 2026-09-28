@@ -11,7 +11,7 @@ create table if not exists public.profiles (
 
 create table if not exists public.candidates (
   id uuid primary key default gen_random_uuid(),
-  owner_id uuid not null references auth.users(id) on delete cascade,
+  owner_id uuid references auth.users(id) on delete cascade,
   full_name text not null,
   email text,
   created_at timestamptz not null default now()
@@ -19,7 +19,7 @@ create table if not exists public.candidates (
 
 create table if not exists public.companies (
   id uuid primary key default gen_random_uuid(),
-  owner_id uuid not null references auth.users(id) on delete cascade,
+  owner_id uuid references auth.users(id) on delete cascade,
   name text not null,
   country text,
   country_code text,
@@ -30,7 +30,7 @@ create table if not exists public.companies (
 
 create table if not exists public.applications (
   id uuid primary key default gen_random_uuid(),
-  owner_id uuid not null references auth.users(id) on delete cascade,
+  owner_id uuid references auth.users(id) on delete cascade,
   candidate_id uuid not null references public.candidates(id) on delete cascade,
   company_id uuid not null references public.companies(id) on delete cascade,
   role_title text not null,
@@ -50,7 +50,7 @@ create table if not exists public.applications (
 
 create table if not exists public.emails (
   id uuid primary key default gen_random_uuid(),
-  owner_id uuid not null references auth.users(id) on delete cascade,
+  owner_id uuid references auth.users(id) on delete cascade,
   application_id uuid references public.applications(id) on delete cascade,
   gmail_message_id text unique,
   gmail_thread_id text,
@@ -66,7 +66,7 @@ create table if not exists public.emails (
 
 create table if not exists public.activities (
   id uuid primary key default gen_random_uuid(),
-  owner_id uuid not null references auth.users(id) on delete cascade,
+  owner_id uuid references auth.users(id) on delete cascade,
   application_id uuid references public.applications(id) on delete cascade,
   activity_type text not null,
   details jsonb not null default '{}'::jsonb,
@@ -92,3 +92,17 @@ create policy "companies_own_rows" on public.companies for all to authenticated 
 create policy "applications_own_rows" on public.applications for all to authenticated using ((select auth.uid()) = owner_id) with check ((select auth.uid()) = owner_id);
 create policy "emails_own_rows" on public.emails for all to authenticated using ((select auth.uid()) = owner_id) with check ((select auth.uid()) = owner_id);
 create policy "activities_own_rows" on public.activities for all to authenticated using ((select auth.uid()) = owner_id) with check ((select auth.uid()) = owner_id);
+
+
+-- Cover foreign keys used by joins and owner-scoped queries.
+create index if not exists activities_application_id_idx on public.activities(application_id);
+create index if not exists activities_owner_id_idx on public.activities(owner_id);
+create index if not exists applications_candidate_id_idx on public.applications(candidate_id);
+create index if not exists applications_company_id_idx on public.applications(company_id);
+create index if not exists candidates_owner_id_idx on public.candidates(owner_id);
+create index if not exists companies_owner_id_idx on public.companies(owner_id);
+create index if not exists emails_application_id_idx on public.emails(application_id);
+create index if not exists emails_owner_id_idx on public.emails(owner_id);
+
+-- owner_id is nullable only to support private staged imports.
+-- RLS policies intentionally do not expose rows whose owner_id is null.
