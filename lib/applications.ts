@@ -28,8 +28,15 @@ function one<T>(value: Relation<T>): T | null {
   return value;
 }
 
+import { redirect } from "next/navigation";
+
 export async function getApplications(): Promise<Application[]> {
   const supabase = await createClient();
+
+  const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
+  if (claimsError || !claimsData?.claims) {
+    redirect("/login");
+  }
 
   const { data, error } = await supabase
     .from("applications")
