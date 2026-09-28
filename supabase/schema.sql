@@ -34,7 +34,7 @@ create table if not exists public.applications (
   candidate_id uuid not null references public.candidates(id) on delete cascade,
   company_id uuid not null references public.companies(id) on delete cascade,
   role_title text not null,
-  status text not null default 'Aguardando' check (status in ('Aguardando','Follow-up','Resposta recebida','Entrevista','Oferta','Recusada','Vaga encerrada')),
+  status text not null default 'Aguardando' check (status in ('Aguardando','Follow-up','Resposta recebida','Entrevista','Oferta','Recusada','Vaga encerrada','Falha de entrega')),
   source text not null default 'Email' check (source in ('Email','Portal','LinkedIn','Outro')),
   stage text,
   applied_at date not null default current_date,
