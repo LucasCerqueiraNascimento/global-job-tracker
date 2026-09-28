@@ -106,3 +106,34 @@ create index if not exists emails_owner_id_idx on public.emails(owner_id);
 
 -- owner_id is nullable only to support private staged imports.
 -- RLS policies intentionally do not expose rows whose owner_id is null.
+
+
+-- Staged historical imports remain private. Only the verified workspace
+-- email can read them before ownership is assigned.
+create policy "authorized_email_read_staged_candidates"
+on public.candidates for select to authenticated
+using (
+  owner_id is null
+  and lower(coalesce((select auth.jwt() ->> 'email'), '')) = 'us.nascimento.id@gmail.com'
+);
+
+create policy "authorized_email_read_staged_companies"
+on public.companies for select to authenticated
+using (
+  owner_id is null
+  and lower(coalesce((select auth.jwt() ->> 'email'), '')) = 'us.nascimento.id@gmail.com'
+);
+
+create policy "authorized_email_read_staged_applications"
+on public.applications for select to authenticated
+using (
+  owner_id is null
+  and lower(coalesce((select auth.jwt() ->> 'email'), '')) = 'us.nascimento.id@gmail.com'
+);
+
+create policy "authorized_email_read_staged_emails"
+on public.emails for select to authenticated
+using (
+  owner_id is null
+  and lower(coalesce((select auth.jwt() ->> 'email'), '')) = 'us.nascimento.id@gmail.com'
+);
