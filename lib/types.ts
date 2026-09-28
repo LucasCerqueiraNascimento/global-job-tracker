@@ -5,7 +5,8 @@ export type ApplicationStatus =
   | "Resposta recebida"
   | "Entrevista"
   | "Oferta"
-  | "Recusada";
+  | "Recusada"
+  | "Falha de entrega";
 
 export type Application = {
   id: string;
