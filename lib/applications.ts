@@ -1,10 +1,11 @@
+import { redirect } from "next/navigation";
 import type { Application, ApplicationStatus, Candidate } from "./types";
 import { createClient } from "./supabase/server";
 
-type Relation<T> = T | T[] | null;
-
 type ApplicationRow = {
   id: string;
+  candidate_id: string;
+  company_id: string;
   role_title: string;
   status: string;
   source: string;
@@ -14,55 +15,80 @@ type ApplicationRow = {
   recipient_email: string | null;
   cv_name: string | null;
   notes: string | null;
-  candidate: Relation<{ full_name: string }>;
-  company: Relation<{
-    name: string;
-    country: string | null;
-    country_code: string | null;
-    city: string | null;
-  }>;
 };
 
-function one<T>(value: Relation<T>): T | null {
-  if (Array.isArray(value)) return value[0] ?? null;
-  return value;
-}
+type CandidateRow = {
+  id: string;
+  full_name: string;
+};
 
-import { redirect } from "next/navigation";
+type CompanyRow = {
+  id: string;
+  name: string;
+  country: string | null;
+  country_code: string | null;
+  city: string | null;
+};
 
 export async function getApplications(): Promise<Application[]> {
   const supabase = await createClient();
 
-  const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
-  if (claimsError || !claimsData?.claims) {
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData.user) {
     redirect("/login");
   }
 
-  const { data, error } = await supabase
+  const { data: applicationData, error: applicationError } = await supabase
     .from("applications")
-    .select(`
-      id,
-      role_title,
-      status,
-      source,
-      stage,
-      applied_at,
-      follow_up_at,
-      recipient_email,
-      cv_name,
-      notes,
-      candidate:candidates!applications_candidate_id_fkey(full_name),
-      company:companies!applications_company_id_fkey(name,country,country_code,city)
-    `)
+    .select(
+      "id,candidate_id,company_id,role_title,status,source,stage,applied_at,follow_up_at,recipient_email,cv_name,notes",
+    )
     .order("applied_at", { ascending: false });
 
-  if (error) {
-    throw new Error(`Unable to load applications: ${error.message}`);
+  if (applicationError) {
+    console.error("applications query failed", {
+      code: applicationError.code,
+      message: applicationError.message,
+      details: applicationError.details,
+      hint: applicationError.hint,
+    });
+    return [];
   }
 
-  return ((data ?? []) as unknown as ApplicationRow[]).map((row) => {
-    const candidate = one(row.candidate);
-    const company = one(row.company);
+  const rows = (applicationData ?? []) as ApplicationRow[];
+  if (!rows.length) return [];
+
+  const candidateIds = [...new Set(rows.map((row) => row.candidate_id))];
+  const companyIds = [...new Set(rows.map((row) => row.company_id))];
+
+  const [
+    { data: candidateData, error: candidateError },
+    { data: companyData, error: companyError },
+  ] = await Promise.all([
+    supabase.from("candidates").select("id,full_name").in("id", candidateIds),
+    supabase
+      .from("companies")
+      .select("id,name,country,country_code,city")
+      .in("id", companyIds),
+  ]);
+
+  if (candidateError) {
+    console.error("candidates query failed", candidateError);
+  }
+  if (companyError) {
+    console.error("companies query failed", companyError);
+  }
+
+  const candidates = new Map(
+    ((candidateData ?? []) as CandidateRow[]).map((row) => [row.id, row]),
+  );
+  const companies = new Map(
+    ((companyData ?? []) as CompanyRow[]).map((row) => [row.id, row]),
+  );
+
+  return rows.map((row) => {
+    const candidate = candidates.get(row.candidate_id);
+    const company = companies.get(row.company_id);
 
     return {
       id: row.id,
